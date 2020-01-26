@@ -13,7 +13,7 @@
       *shell-program* (getenv "SHELL"))
 
 ;; Basics
-(set-prefix-key (kbd "s-t"))
+(set-prefix-key (kbd "C-t"))
 
 (set-module-dir
  (pathname-as-directory (concat (getenv "HOME")
@@ -132,13 +132,52 @@ run-or-raise with group search t."
          (win (stumpwm::frame-window (car (last frames)))))
     (shift-windows-forward frames win)))
 
+(defun executable-find (name)
+  "Tell if given executable is present in PATH."
+  (let ((which-out (string-trim '(#\  #\linefeed) (run-shell-command (concat "which " name) t))))
+    (unless (string-equal "" which-out) which-out)))
+
+(defun slop-get-pos ()
+  (mapcar #'parse-integer (ppcre:split "[^0-9]" (run-shell-command "slop -f \"%x %y %w %h\"" t))))
+
+(defun slop-or-float ()
+  "Slop the current window or just float if slop cli not present."
+  (if (executable-find "slop")
+      (let ((window (current-window))
+            (pos (slop-get-pos)))
+        (float-window window (current-group))
+        (float-window-move-resize window
+                                  :x (nth 0 pos)
+                                  :y (nth 1 pos)
+                                  :width (nth 2 pos)
+                                  :height (nth 3 pos)))
+      (run-commands "float-this")))
+
+(defcommand slop-this () () (slop-or-float))
+
+;; Define the background window
+(defvar *background-image-path* "~/Pictures/Wallpapers/")
+(defun select-random-background-image ()
+  "Select a random image"
+  (let ((file-list (directory (concatenate 'string *background-image-path* "*.jpg")))
+        (*random-state* (make-random-state t)))
+    (namestring (nth (random (length file-list)) file-list))))
+
 (define-key *top-map* (kbd "s-r") "rotate-windows")
+(define-key *top-map* (kbd "s-g") "toggle-gaps")
+(define-key *top-map* (kbd "s-f") "slop-this")
+(define-key *top-map* (kbd "s-u") "unfloat-this")
+(define-key *top-map* (kbd "s-a") "toggle-always-show")
+(define-key *top-map* (kbd "s-t") "toggle-always-on-top")
 
 ;; Init
 (update-color-map (current-screen))
-(run-shell-command "sh ~/.fehbg")
+(run-shell-command "xrdb ~/.Xresources")
 (run-shell-command "xmodmap .Xmodmap")
+(run-shell-command "xsetroot -cursor_name left_ptr")
+(run-shell-command (concatenate 'string "feh --bg-tile " (select-random-background-image)))
 (run-shell-command "xset b off")
+(run-shell-command "xscreensaver -nosplash")
 
 ;; Programs
 (run-shell-command "picom")
